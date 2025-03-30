@@ -1,0 +1,232 @@
+---
+title: "Hell3"
+date: "2024-08-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(LANG = "en")
+setwd("C:/Users/Lecuo/Desktop/StatLabWithR")
+#install.packages("readxl")
+library(readxl)
+#install.packages("car")
+library(car)
+#install.packages("corrplot")
+library(corrplot)
+#install.packages("MASS")
+library(MASS)
+rm(list = ls())
+```
+
+```{r}
+hour<-read.csv("day.csv", header = T)
+hour$season<-as.factor(hour$season)
+#hour$year<-as.factor(hour$year)
+hour$holiday<-as.factor(hour$holiday)
+hour$weekday<-as.factor(hour$weekday)
+hour$workingday<-as.factor(hour$workingday)
+hour$weathersit<-as.factor(hour$weathersit)
+hour$mnth<-as.factor(hour$mnth)
+
+head(hour)
+```
+
+```{r}
+# Get the unique values in the 'group' column
+unique_hr <-c('early')
+
+# Initialize a data.frame to hold the dummy variables
+dummy_hr <- as.data.frame(matrix(0, nrow = nrow(hour), ncol = length(unique_hr)))
+colnames(dummy_hr) <- paste0("hr_", unique_hr)
+
+first_half <- hour$hr <= 12
+#dummy_hr$hr_early <- ifelse(first_half, 1, 0)
+#dummy_hr$hr_late <- ifelse(first_half, 0, 1)
+
+# Combine the original data.frame with the dummy variables
+hour <- cbind(hour, dummy_hr)
+all_hr<-names(dummy_hr)
+all_hr_formula <- paste(all_hr, collapse = " + ")
+all_hr_formula
+head(hour)
+```
+
+```{r}
+# Get the unique values in the 'group' column
+unique_mnth <- c('mid')
+
+# Initialize a data.frame to hold the dummy variables
+dummy_mnth <- as.data.frame(matrix(0, nrow = nrow(hour), ncol = length(unique_mnth)))
+colnames(dummy_mnth) <- paste0("mnth_", unique_mnth)
+
+first_half <- ((as.integer(hour$mnth) <= 10) & (as.integer(hour$mnth) >= 5))
+dummy_mnth$mnth_mid <- ifelse(first_half, 1,0)
+
+# Combine the original data.frame with the dummy variables
+hour <- cbind(hour, dummy_mnth)
+all_mnth<-names(dummy_mnth)
+all_mnth_formula <- paste(all_mnth, collapse = " + ")
+all_mnth_formula
+head(hour)
+```
+
+```{r}
+# Get the unique values in the 'group' column
+unique_season <- unique(hour$season)
+
+# Initialize a data.frame to hold the dummy variables
+dummy_season <- as.data.frame(matrix(0, nrow = nrow(hour), ncol = length(unique_season)))
+colnames(dummy_season) <- paste0("season_", unique_season)
+
+# Fill the dummy variables
+for (i in seq_along(unique_season)) {
+  dummy_season[[i]] <- as.integer(hour$season == unique_season[i])
+}
+
+# Combine the original data.frame with the dummy variables
+hour <- cbind(hour, dummy_season)
+all_season<-names(dummy_season)
+all_season_formula <- paste(all_season, collapse = " + ")
+all_season_formula
+head(hour)
+```
+
+```{r}
+attach(hour)
+```
+
+```{r}
+str(hour)
+```
+
+```{r}
+data<-hour
+numeric_data <- data[sapply(data, is.numeric)]
+cor_matrix<-cor(numeric_data)
+corrplot(cor_matrix, method = "circle", type = "upper",
+         tl.col = "black", tl.srt = 45, # Text label color and rotation
+         col = colorRampPalette(c("red", "white", "blue"))(200), # Color palette
+         addCoef.col = "black", # Add correlation coefficient values
+         diag = FALSE) # Remove the diagonal
+```
+
+```{r}
+full_model<-lm(casual~ temp + hum + windspeed,data = hour)
+vif(full_model)
+```
+
+```{r}
+#boxcoxnc(hour$w, method='sw', lambda2=2, lambda =seq(-5,5,0.01),plot=TRUE, alpha=0.05, verbose=TRUE)
+```
+
+```{r}
+par(mfrow = c(2,2))
+target<-registered
+hist(target, breaks = 40)
+boxplot(target)
+hist(log(target), breaks = 40)
+boxplot(log(target))
+```
+
+```{r}
+guess<-casual
+shapiro.test(guess)
+shapiro.test(log(guess))
+```
+
+```{r}
+#sum(hour$mnth %% 3 + 1 - hour$season)
+```
+
+```{r}
+par(mfrow = c(1,2))
+response<-registered
+predictor<-weathersit
+boxplot((response)~predictor)
+boxplot(log(response)~predictor)
+```
+
+```{r}
+par(mfrow = c(2,2))
+response<-registered
+predictor<- temp * windspeed
+plot(predictor, response)
+plot(predictor, log(response))
+plot(log(predictor), response)
+plot(log(predictor), log(response))
+```
+
+```{r}
+holiday <- as.double(holiday)
+workingday <- as.double(workingday)
+weekday <- as.double(workingday)
+vif(lm(registered~holiday+workingday))
+cor(data.frame(registered,holiday,workingday,weekday))
+holiday <- as.factor(holiday)
+workingday <- as.factor(workingday)
+weekday <- as.factor(workingday)
+```
+
+```{r}
+scatterplot((registered)~ hum | weathersit)
+```
+
+```{r}
+set.seed(777489)
+n<-nrow(hour)
+train_indice<-sample(seq_len(n), size = 0.8 * n)
+train_data<-hour[train_indice, ]
+test_data<-hour[-train_indice, ]
+```
+
+```{r}
+model1<-lm((registered) ~ weekday + workingday + holiday + yr + mnth + weathersit + (temp) + (hum) + (windspeed), data = train_data)
+#model1<-update(model1, as.formula(paste(". ~ . + ", all_mnth_formula)), data =train_data)
+model1<-update(model1, as.formula(paste(". ~ . + ", all_season_formula)), data =train_data)
+#model1<-update(model1, as.formula(paste(". ~ . + ", all_hr_formula)), data =train_data)
+model1<-step(model1)
+summary(model1)
+AIC(model1)
+BIC(model1)
+```
+
+```{r}
+durbinWatsonTest(model1)
+```
+
+```{r}
+prediction<-predict(model1, newdata = test_data)
+residuals<-test_data$registered - prediction
+shapiro.test(residuals)
+```
+
+```{r}
+leveneTest(residuals(model1)~ train_data$weathersit)
+```
+
+```{r}
+model2<-lm((registered) ~ holiday + yr + weathersit + temp + (temp):season + temp:mnth + (hum) + hum:mnth + hum:weathersit + (windspeed) , data = train_data)
+summary(model2)
+#model2<-update(model2, as.formula(paste(". ~ . + ", all_mnth_formula)), data =train_data)
+#model2<-update(model2, as.formula(paste(". ~ . + ", all_season_formula)), data =train_data)
+#model2<-update(model2, as.formula(paste(". ~ . + ", all_hr_formula)), data =train_data)
+model2<-step(model2)
+summary(model2)
+AIC(model2)
+BIC(model2)
+```
+
+```{r}
+prediction<-predict(model2, newdata = test_data)
+residuals<-test_data$registered - prediction
+shapiro.test(residuals)
+```
+
+```{r}
+#leveneTest(residuals)
+```
+
+```{r}
+xtable(summary(model2))
+```

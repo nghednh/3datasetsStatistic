@@ -1,0 +1,352 @@
+---
+title: "Final"
+date: "2024-08-09"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(LANG = "en")
+setwd("C:/Users/Lecuo/Desktop/StatLabWithR")
+library(dplyr)
+#install.packages("xtable")
+library(xtable)
+#install.packages("papeR")
+library(papeR)
+library(car)
+library(MASS)
+library(ggplot2)
+#install.packages("plotrix")
+library(plotrix)
+rm(list = ls())
+```
+
+# Final
+
+## Problem 1
+
+### Import data
+
+Note: Local files, please set directory to your own.
+
+```{r}
+data<-read.csv("auto_mpg.csv",header=TRUE,sep=';')
+dim(data)
+sink(file = "dataheading.txt")
+data
+sink(file = NULL)
+```
+
+```{r}
+data<-subset(data, data$horsepower != "?")
+data$horsepower<-as.double(data$horsepower)
+gooddata<-subset(data, select = -c(model_year,origin,car_name))
+gooddata
+xtable(summarize(gooddata), caption = "Basic univariate summary statistics for mgp, cylinders, displacement, horsepower, weight, acceleration")
+sink(file = "datasummary.txt")
+summary(data)
+sink()
+```
+
+```{r}
+jpeg(file="mpgtrans.jpeg")
+par(mfrow=c(2,2))
+hist(data$weight, breaks = 40)
+boxplot(data$weight)
+#dev.off()
+#jpeg(file="mpgtrans2.jpeg")
+#par(mfrow=c(1,2))
+hist(log(data$weight), breaks = 40)
+boxplot(log(data$weight))
+dev.off()
+jpeg(file="mpgtrans3.jpeg")
+par(mfrow=c(2,2))
+hist(sqrt(data$weight), breaks = 40)
+boxplot(sqrt(data$weight))
+#dev.off()
+#jpeg(file="mpgtrans4.jpeg")
+#par(mfrow=c(1,2))
+hist(1/sqrt(data$weight), breaks = 40)
+boxplot(1/sqrt(data$weight))
+dev.off()
+```
+
+```{r}
+png(file="mpgloghist.png")
+par(mfrow=c(1,1))
+mpg<-data$mgp
+hist(log(mpg), breaks = 40)
+dev.off()
+```
+
+```{r}
+png(file="disphist.png")
+par(mfrow=c(1,1))
+displacement<-data$displacement
+hist(displacement, breaks = 40)
+dev.off()
+```
+
+```{r}
+png(file="accelhist.png")
+par(mfrow=c(1,1))
+
+acceleration <- data$acceleration
+hist(acceleration, breaks = 40)
+dev.off()
+```
+
+```{r}
+png(file="accelhist.png")
+par(mfrow=c(1,1))
+
+acceleration <- data$acceleration
+hist(acceleration, breaks = 40)
+dev.off()
+```
+
+```{r}
+png(file="hphist.png")
+par(mfrow=c(1,1))
+
+horsepower <- data$horsepower
+hist(horsepower, breaks = 40)
+dev.off()
+```
+
+```{r}
+png(file="weighthist.png")
+par(mfrow=c(1,1))
+
+weight <- data$weight
+hist(weight, breaks = 40)
+dev.off()
+```
+
+\
+
+```{r}
+png(file="cylinderbarplot.png")
+par(mfrow=c(1,1))
+ggplot(data, aes(x=factor(cylinders)))+
+  geom_bar(stat="count", width=0.7, fill="steelblue")+
+  theme_minimal()
+dev.off()
+```
+
+```{r}
+labels(data)
+gooddata<-data
+gooddata$model_year = as.factor((gooddata$model_year))
+gooddata$origin = as.factor(gooddata$origin)
+gooddata$cylinders = as.factor(gooddata$cylinders)
+xtable(summarize(gooddata, type = "factor", variables = "model_year"), caption = "Basic univariate summary statistics for model_year")
+xtable(summarize(gooddata, type = "factor", variables = "origin"), caption = "Basic univariate summary statistics for origin")
+xtable(summarize(gooddata, type = "factor", variables = "cylinders"), caption = "Basic univariate summary statistics for cylinders")
+```
+
+\
+
+```{r}
+data = subset(data,data$horsepower!="?")
+data
+data$horsepower<-as.double(data$horsepower)
+data
+```
+
+```{r}
+set.seed(0)
+n<-nrow(data)
+train_indice<-sample(seq_len(n), size = 0.8 * n)
+train_data<-data[train_indice, ]
+test_data<-data[-train_indice, ]
+train_data
+test_data
+data<-train_data
+```
+
+```{r}
+data$origin<-as.factor(data$origin)
+data
+attach(data)
+model<-lm(data$mgp~data$cylinders+data$displacement+data$horsepower+data$weight+data$acceleration+data$model_year+data$origin)
+model<-step(model)
+xtable(summary(model))
+#sink(file = "test.txt")
+summary(model)
+#sink()
+AIC(model)
+BIC(model)
+```
+
+```{r}
+summary(model)
+```
+
+```{r}
+model_full<-lm(data$mgp ~ data$displacement + data$weight + data$acceleration + data$model_year + data$origin)
+model_reduced<-lm(data$mgp ~ data$weight + data$acceleration + data$model_year + data$origin)
+anova(model_full,model_reduced)
+```
+
+```{r}
+boxcox(lm(data$mgp~1))
+png("weightboxcox.png")
+boxcox(lm(data$weight~1))
+dev.off()
+png("accelboxcox.png")
+boxcox(lm(data$acceleration~1))
+dev.off()
+```
+
+```{r}
+acceleration<-data$acceleration
+jpeg(file="acceltrans1.jpeg")
+par(mfrow=c(2,2))
+hist(acceleration, breaks = 40)
+boxplot(acceleration)
+#dev.off()
+#jpeg(file="mpgtrans2.jpeg")
+#par(mfrow=c(1,2))
+hist(log(acceleration), breaks = 40)
+boxplot(log(acceleration))
+dev.off()
+jpeg(file="acceltrans2.jpeg")
+par(mfrow=c(2,2))
+hist(sqrt(acceleration), breaks = 40)
+boxplot(sqrt(acceleration))
+#dev.off()
+#jpeg(file="mpgtrans4.jpeg")
+#par(mfrow=c(1,2))
+hist(1/sqrt(acceleration), breaks = 40)
+boxplot(1/sqrt(acceleration))
+dev.off()
+```
+
+```{r}
+shapiro.test(data$acceleration)
+shapiro.test(log(data$acceleration))
+shapiro.test(sqrt(data$acceleration))
+shapiro.test(1/sqrt(data$acceleration))
+```
+
+```{r}
+shapiro.test(data$weight)
+shapiro.test(log(data$weight))
+shapiro.test(sqrt(data$weight))
+shapiro.test(1/sqrt(data$weight))
+```
+
+```{r}
+shapiro.test(data$weight)
+shapiro.test(data$acceleration)
+shapiro.test(log(data$acceleration))
+shapiro.test(log(data$acceleration))
+
+```
+
+```{r}
+logmgp<-sqrt(sqrt(data$mgp))
+shapiro.test(logmgp)
+hist(logmgp,breaks=40)
+```
+
+```{r}
+model<-lm(mgp~displacement+horsepower+weight+acceleration+model_year+origin)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+model<-lm(mgp~displacement+horsepower+weight+model_year+origin)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+model<-lm(mgp~displacement+weight+model_year+origin)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+model<-lm(mgp~weight+model_year+origin)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+model<-lm(mgp~weight+model_year)
+summary(model)
+goodmodel<-model
+AIC(model)
+BIC(model)
+```
+
+```{r}
+model<-lm(mgp~weight)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+boxcox(lm(data$mgp~1))
+boxcox(lm(data$a~1))
+```
+
+```{r}
+#model_year<-as.factor(model_year)
+model<-lm(mgp~weight+model_year)
+summary(model)
+AIC(model)
+BIC(model)
+```
+
+```{r}
+eps<-test_data$mgp-predict(goodmodel, newdata=test_data)
+eps
+```
+
+```{r}
+shapiro.test(eps)
+```
+
+```{r}
+hist(sqrt(mpg),breaks = 40)
+```
+
+```{r}
+model2<-lm(log(mgp)~data$displacement+log(weight) + acceleration + model_year + origin)
+#model2<-lm(sqrt(sqrt(mgp))~log(weight) + log(acceleration) + model_year + origin)
+summary(model2)
+```
+
+```{r}
+model2_2<-step(model2)
+summary(model2_2)
+```
+
+```{r}
+test_data$origin <- as.factor(test_data$origin)
+eps<-log(test_data$mgp)-predict(model2_2, newdata=test_data)
+eps
+```
+
+```{r}
+shapiro.test(eps)
+```
+
+```{r}
+durbinWatsonTest(model2_2)
+```
+
+```{r}
+leveneTest(residuals(model2_2)~data$origin)
+```

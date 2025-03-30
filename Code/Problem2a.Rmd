@@ -1,0 +1,224 @@
+---
+title: "Hell3"
+date: "2024-08-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(LANG = "en")
+setwd("C:/Users/Lecuo/Desktop/StatLabWithR")
+#install.packages("readxl")
+library(readxl)
+#install.packages("car")
+library(car)
+#install.packages("corrplot")
+library(corrplot)
+#install.packages("MASS")
+#install.packages("xtable")
+#install.packages("papeR")
+library(MASS)
+library(papeR)
+library(xtable)
+rm(list = ls())
+```
+
+```{r}
+restaurant<-read.csv('restaurant_data.csv', header = T)
+restaurant$Parking.Availability<-as.integer(ifelse(restaurant$Parking.Availability == 'Yes', 1, 0))
+restaurant$Cuisine<-as.factor(restaurant$Cuisine)
+restaurant$Location<-as.factor(restaurant$Location)
+head(restaurant)
+```
+
+```{r}
+# Get the unique values in the 'group' column
+unique_location <- unique(restaurant$Location)
+
+# Initialize a data.frame to hold the dummy variables
+dummy_location <- as.data.frame(matrix(0, nrow = nrow(restaurant), ncol = length(unique_location)))
+colnames(dummy_location) <- paste0(unique_location)
+
+# Fill the dummy variables
+for (i in seq_along(unique_location)) {
+  dummy_location[[i]] <- as.integer(restaurant$Location == unique_location[i])
+}
+
+# Combine the original data.frame with the dummy variables
+restaurant <- cbind(restaurant, dummy_location)
+all_location<-names(dummy_location)
+all_location_formula <- paste(all_location, collapse = " + ")
+all_location_formula
+head(restaurant)
+```
+
+```{r}
+# Get the unique values in the 'group' column
+unique_cuisine <- unique(restaurant$Cuisine)
+
+# Initialize a data.frame to hold the dummy variables
+dummy_cuisine <- as.data.frame(matrix(0, nrow = nrow(restaurant), ncol = length(unique_cuisine)))
+colnames(dummy_cuisine) <- paste0(unique_cuisine)
+
+# Fill the dummy variables
+for (i in seq_along(unique_cuisine)) {
+  dummy_cuisine[[i]] <- as.integer(restaurant$Cuisine == unique_cuisine[i])
+}
+
+# Combine the original data.frame with the dummy variables
+restaurant <- cbind(restaurant, dummy_cuisine)
+all_cuisine<-names(dummy_cuisine)
+all_cuisine_formula <- paste(all_cuisine, collapse = " + ")
+all_cuisine_formula
+head(restaurant)
+```
+
+```{r}
+attach(restaurant)
+str(restaurant)
+```
+
+```{r}
+full_model<-lm(log(Revenue) ~ Seating.Capacity + Average.Meal.Price + log(Marketing.Budget) + Weekday.Reservations + Weekend.Reservations,data = restaurant)
+vif(full_model)
+```
+
+```{r}
+#par(mfrow = c(2,2))
+#response<-Revenue
+#predictor<-Number.of.Reviews * Location
+#plot(predictor, response)
+#plot(predictor, log(response))
+#plot(log(predictor), response)
+#plot(log(predictor), log(response))
+```
+
+```{r}
+library(ggplot2)
+
+# Sample data
+set.seed(123)
+dataset <- data.frame(
+  X1 = rnorm(100),
+  X2 = rnorm(100),
+  Y = 5 + 3 * rnorm(100) + 2 * rnorm(100) * rnorm(100)
+)
+
+# Create interaction plot
+ggplot(dataset, aes(x = X1, y = Y, color = X2)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Interaction between X1 and X2",
+       x = "X1",
+       y = "Response Y",
+       color = "X2") +
+  theme_minimal()
+```
+
+```{r}
+scatterplot((Revenue)~ c(Weekend.Reservations + Weekday.Reservations) | Cuisine)
+```
+
+```{r}
+par(mfrow = c(1,2))
+response<-Revenue
+predictor<-Cuisine
+boxplot((response)~predictor)
+boxplot(log(response)~predictor)
+```
+
+```{r}
+png("Averboxcox.png")
+boxcox(lm(Average.Meal.Price~1))
+dev.off()
+```
+
+```{r}
+tmp <- Average.Meal.Price
+out <- boxcox(lm(tmp~1))
+range(out$x[out$y > max(out$y)-qchisq(0.95,1)/2])
+```
+
+```{r}
+#par(mfrow = c(2,2))
+#target<-sqrt(Weekend.Reservations)
+#hist(target, breaks = 20)
+#boxplot(target)
+#hist(log(target), breaks = 30)
+#boxplot(log(target))
+```
+
+```{r}
+set.seed(777489)
+n<-nrow(restaurant)
+train_indice<-sample(seq_len(n), size = 0.8 * n)
+train_data<-restaurant[train_indice, ]
+test_data<-restaurant[-train_indice, ]
+```
+
+```{r}
+str(restaurant)
+```
+
+```{r}
+model_1<-lm(log(Revenue) ~ log(Seating.Capacity) + log(Average.Meal.Price) + (Marketing.Budget) + Weekday.Reservations * Weekend.Reservations + Parking.Availability,data = train_data)
+model_1<-update(model_1, as.formula(paste(". ~ . + ", all_location_formula)), data =train_data)
+model_1<-update(model_1, as.formula(paste(". ~ . + ", all_cuisine_formula)), data =train_data)
+model_1<-step(model_1)
+summary(model_1)
+```
+
+```{r}
+durbinWatsonTest(model_1)
+```
+
+```{r}
+prediction<-predict(model_1, newdata = test_data)
+residuals<-log(test_data$Revenue) - prediction
+shapiro.test(residuals)
+```
+
+```{r}
+  model_2<-lm(Revenue ~ Seating.Capacity:log(Average.Meal.Price) + Seating.Capacity:Location + log(Average.Meal.Price):Cuisine + sqrt(Weekday.Reservations) + sqrt(Weekend.Reservations), data = train_data)
+  #model_2<-update(model_2, as.formula(paste(". ~ . + ", all_location_formula)), data =train_data)
+  #model_2<-update(model_2, as.formula(paste(". ~ . + ", all_cuisine_formula)), data =train_data)
+  summary(model_2)
+  model_2<-step(model_2)
+  summary(model_2)
+```
+
+```{r}
+durbinWatsonTest(model_2)
+```
+
+```{r}
+prediction<-predict(model_2, newdata = test_data)
+residuals<-(test_data$Revenue) - prediction
+shapiro.test(residuals)
+```
+
+```{r}
+xtable(summary(model_2))
+```
+
+```{r}
+png("scattertrip.png")
+scatterplot(Revenue, Seating.Capacity*Average.Meal.Price)
+dev.off()
+```
+
+```{r}
+png("scatterthat.png")
+par(mfrow=c(1,2))
+scatterplot(Revenue, Weekday.Reservations)
+scatterplot(Revenue, Weekend.Reservations)
+dev.off()
+```
+
+```{r}
+png("scatterthis.png")
+par(mfrow=c(1,2))
+hist(Weekday.Reservations,breaks=40)
+hist(Weekend.Reservations,breaks=40)
+dev.off()
+```
